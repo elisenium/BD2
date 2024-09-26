@@ -9,6 +9,10 @@ SELECT au.au_id, au.au_lname, au.address
 FROM authors au
 WHERE upper(au.au_fname) LIKE 'A%';
 
+SELECT a.au_id, a.au_lname, a.address
+FROM authors a
+WHERE a.au_fname SIMILAR TO '[Aa]%';
+
 --3 Donnez les noms et adresses complètes des auteurs qui n'ont pas de numéro de téléphone.
 SELECT au.au_lname, au.au_fname, au.address, au.city, au.state, au.country
 FROM authors au
@@ -33,19 +37,23 @@ WHERE t.type = 'psychology';
 
 --7 Donnez les identifiants des éditeurs ayant publié au moins un livre de type "psychologie", si
 -- l'on omet tous les livres dont le prix est compris entre 10 et 25 $ ?
-
 SELECT DISTINCT t.pub_id
 FROM titles t
 WHERE t.type = 'psychology'
   AND (t.price < 10
    OR t.price > 25);
 
+SELECT DISTINCT t.pub_id
+FROM titles t
+WHERE t.type = 'psychology'
+  AND t.price NOT BETWEEN 10 AND 25;
+
 --8 Donnez la liste des villes de Californie où l'on peut trouver un (ou plusieurs) auteur(s)
 -- dont le prénom est Albert ou dont le nom finit par "er".
 SELECT DISTINCT au.city
 FROM authors au
 WHERE (lower(au.au_fname) = 'albert'
-  OR lower(au.au_lname) = '%er')
+  OR lower(au.au_lname) LIKE '%er')
   AND au.state = 'CA'
   AND au.city IS NOT NULL;
 

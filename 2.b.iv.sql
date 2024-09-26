@@ -31,6 +31,23 @@ WHERE st.stor_id = s.stor_id
   AND 11 = date_part('month', s.date)
   AND 1991 = date_part('year', s.date);
 
+SELECT DISTINCT st.stor_name, st.stor_address
+FROM stores st, sales s
+WHERE st.stor_id = s.stor_id
+  AND '1991' = date_part('y', s.date)
+  AND '11' = date_part('m', s.date);
+
+SELECT DISTINCT st.stor_name, st.stor_address
+FROM stores st, sales s
+WHERE st.stor_id = s.stor_id
+  AND s.date BETWEEN '1991-11-01' AND '1991-11-30';
+
+SELECT DISTINCT st.stor_name, st.stor_address
+FROM stores st, sales s
+WHERE st.stor_id = s.stor_id
+  AND s.date >= '1991-11-01'
+  AND s.date <= '1991-11-30';
+
 --6 Quels sont les livres de psychologie de moins de 20 $ édités par des éditeurs dont le nom ne
 -- commence pas par "Algo" ?
 SELECT t.title_id, t.title
@@ -77,6 +94,13 @@ WHERE pub.pub_id = t.pub_id
   AND s.date >= '1990-11-01'
   AND s.date <= '1991-03-01';
 
+SELECT DISTINCT p.pub_id, p.pub_name, p.city, p.state
+FROM publishers p, titles t, salesdetail sd, sales sa
+WHERE p.pub_id = t.pub_id
+  AND t.title_id = sd.title_id
+  AND sd.stor_id = sa.stor_id
+  AND sa.date BETWEEN '1990-11-01' AND '1991-03-01';
+
 --11 Quels magasins ont vendu des livres contenant le mot "cook" (ou "Cook") dans leur titre ?
 -- Utilisation du SIMILAR TO !!
 SELECT DISTINCT st.stor_id, st.stor_name
@@ -85,22 +109,35 @@ WHERE st.stor_id = sd.stor_id
   AND t.title_id = sd.title_id
   AND t.title SIMILAR TO '%[cC]ook%';
 
+SELECT DISTINCT s.stor_id, s.stor_name, s.stor_address, s.city, s.state, s.country
+FROM stores s, salesdetail sd, titles t
+WHERE s.stor_id = sd.stor_id
+  AND t.title_id = sd.title_id
+  AND (t.title LIKE '%Cook%' OR t.title LIKE '%cook%');
+
 --12 Y a-t-il des paires de livres publiés par le même éditeur à la même date ?
 -- => Pas obligé de passer par la table éditeurs car il y a pub_id
-SELECT DISTINCT t1.title, t2.title
+SELECT DISTINCT t1.title_id, t1.title, t2.title_id, t2.title
 FROM titles t1, titles t2
 WHERE t1.pub_id = t2.pub_id
   AND t1.pubdate = t2.pubdate
   AND t1.title_id < t2.title_id; --éviter la duplication !! l'un des 2 doit être plus petit que l'autre
 
 --13 Y a-t-il des auteurs n'ayant pas publié tous leurs livres chez le même éditeur ?
-SELECT a.*
-FROM authors a
-WHERE 1 < (SELECT count(DISTINCT pub_id)
-           FROM titles t, titleauthor ta
-           WHERE t.title_id = ta.title_id);
+SELECT DISTINCT a.au_id, a.au_lname, a.au_fname
+FROM authors a, titleauthor ta1, titleauthor ta2, titles t1, titles t2
+WHERE a.au_id = ta1.au_id
+  AND a.au_id = ta2.au_id
+  AND ta1.title_id = t1.title_id
+  AND ta2.title_id = t2.title_id
+  AND t1.pub_id < t2.pub_id;
 
---Rajouter autre solution
+SELECT DISTINCT a.au_id, a.au_lname, a.au_fname
+FROM titles t, titleauthor ta, authors a
+WHERE t.title_id = ta.title_id
+  AND ta.au_id = a.au_id
+GROUP BY a.au_id, a.au_lname, a.au_fname
+HAVING COUNT(DISTINCT t.pub_id) > 1;
 
 --14 Y a-t-il des livres qui ont été vendus avant leur date de parution ?
 SELECT DISTINCT t.title_id, t.title
@@ -134,7 +171,9 @@ WHERE sd.stor_id = sa.stor_id
 
 --17 Y a-t-il des paires de magasins situés dans le même Etat, où l'on a vendu des livres du même auteur ?
 SELECT DISTINCT st1.stor_id, st2.stor_id, st1.stor_name, st2.stor_name
-FROM stores st1, stores st2, salesdetail sd1, salesdetail sd2, titleauthor ta1, titleauthor ta2
+FROM stores st1, stores st2,
+     salesdetail sd1, salesdetail sd2,
+     titleauthor ta1, titleauthor ta2
 WHERE st1.stor_id = sd1.stor_id
   AND st2.stor_id = sd2.stor_id
   AND ta1.title_id = sd1.title_id
