@@ -5,6 +5,11 @@ FROM titles t, publishers p
 WHERE t.pub_id = p.pub_id
   AND lower(p.pub_name) = 'algodata infosystems';
 
+SELECT AVG(t.price) as "prix_moyen"
+FROM titles t, publishers p
+WHERE t.pub_id = p.pub_id
+  AND p.pub_name = 'Algodata Infosystems';
+
 --2 Quel est le prix moyen des livres écrits par chaque auteur ? (Pour chaque auteur, donnez son
 --nom, son prénom et le prix moyen de ses livres.)
 --=>La moyenne ne prend pas en compte les valeurs nulles!! t.price IS NOT NULL n'est pas necessaire
@@ -37,10 +42,10 @@ GROUP BY t.title_id, t.title, t.price;
 
 --5 Quels sont les livres qui ont été vendus dans plusieurs magasins ?
 -- On a pas demandé d'afficher le COUNT donc on le mets pas dans le SELECT
-SELECT DISTINCT t.title
+SELECT t.title_id, t.title
 FROM titles t, salesdetail sd
 WHERE t.title_id = sd.title_id
-GROUP BY t.title
+GROUP BY t.title_id, t.title
 HAVING COUNT(DISTINCT sd.stor_id) > 1;
 
 --6 Pour chaque type de livre, donnez le nombre total de livres de ce type ainsi que leur prix moyen.
@@ -52,7 +57,7 @@ GROUP BY t.type;
 --7 Pour chaque livre, le "total_sales" devrait normalement être égal au nombre total des ventes enregistrées pour ce livre,
 -- c'est-à-dire à la somme de toutes les "qty" des détails de vente relatifs à ce livre.
 -- Vérifiez que c'est bien le cas en affichant pour chaque livre ces deux valeurs côte à côte, ainsi que l'identifiant du livre.
-
+-- LEFT OUTER JOIN: pour garder les valeurs nulles
 SELECT t.title_id, t.title, COALESCE(t.total_sales, 0), COALESCE(SUM(sd.qty),0) AS "details_des_ventes"
 FROM titles t LEFT OUTER JOIN salesdetail sd
 ON t.title_id = sd.title_id
@@ -67,10 +72,10 @@ HAVING COALESCE(t.total_sales,0) != COALESCE(SUM(sd.qty),0);
 
 
 --9 Quels sont les livres ayant été écrits par au moins 3 auteurs ?
-SELECT t.title, t.title_id --...+le reste
+SELECT t.title_id, t.title, t.type, t.pub_id, t.pubdate, t.price, t.total_sales
 FROM titles t, titleauthor ta
 WHERE t.title_id = ta.title_id
-GROUP BY t.title, t.title_id --...+le reste
+GROUP BY t.title_id, t.title, t.type, t.pub_id, t.pubdate, t.price, t.total_sales
 HAVING COUNT(ta.au_id) > 2;
 
 --10 Combien d'exemplaires de livres d'auteurs californiens édités par des éditeurs californiens a- t-on vendus dans
