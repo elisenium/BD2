@@ -134,3 +134,61 @@ BEGIN
     RETURN toReturn;
 END
 $$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION gestion_evenements.ajouterEvenement(_salle INTEGER, _date_evenement DATE, _nom VARCHAR(100), _prix MONEY, _festival INTEGER) RETURNS VOID AS $$
+DECLARE
+    _nb_places_restantes INTEGER;
+BEGIN
+    IF (_date_evenement < CURRENT_DATE) THEN
+        RAISE EXCEPTION 'La date de l''événement ajoutée est antérieure à la date actuelle';
+    END IF;
+
+    SELECT s.capacite INTO _nb_places_restantes FROM gestion_evenements.salles s WHERE s.id_salle = _salle;
+    INSERT INTO gestion_evenements.evenements(salle, date_evenement, nom, prix, festival, nb_places_restantes)
+    VALUES (_salle, _date_evenement, _nom, _prix, _festival, _nb_places_restantes);
+END
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION gestion_evenements.ajouterConcert(_artiste INTEGER, _date_evenement DATE, _heure_debut TIME, _salle INTEGER)
+    RETURNS VOID AS $$
+BEGIN
+    IF (_date_evenement < CURRENT_DATE) THEN
+        RAISE EXCEPTION 'La date de l''événement ajoutée est antérieure à la date actuelle';
+    END IF;
+
+    IF (EXISTS(SELECT 1
+               FROM gestion_evenements.concerts c, gestion_evenements.evenements e
+               WHERE c.salle = e.salle
+                 AND c.date_evenement = e.date_evenement
+                 AND c.artiste = _artiste
+                 AND e.salle = _salle
+                 AND e.festival IS NOT NULL)) THEN
+        RAISE EXCEPTION 'Un artiste ne peut pas avoir deux concerts pour le même festival';
+    END IF;
+
+    INSERT INTO gestion_evenements.concerts(artiste, date_evenement, heure_debut, salle)
+    VALUES (_artiste, _date_evenement, _heure_debut, _salle);
+END
+$$ LANGUAGE plpgsql;
+
+/* TESTS */
+SELECT gestion_evenements.ajouterSalle('Palais 12', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('La Madeleine', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('Cirque Royal', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('Sportpaleis Antwerpen', 'Anvers', 15000);
+
+SELECT gestion_evenements.ajouterFestival('Les Ardentes');
+SELECT gestion_evenements.ajouterFestival('Lolapalooza');
+SELECT gestion_evenements.ajouterFestival('Afronation');
+
+SELECT gestion_evenements.ajouterArtiste('Beyoncé', 'USA');
+SELECT gestion_evenements.ajouterArtiste('Eminem');
+
+SELECT gestion_evenements.ajouterClient('user007', 'user007@live.be', '***********');
+--SELECT gestion_evenements.ajouterClient('user007', 'user007@.be', '***ok********'); --Test: PK
+SELECT gestion_evenements.ajouterClient('user1203', 'user007@live.be', '***********');
+SELECT gestion_evenements.ajouterEvenement(1, '2024-11-21', 'Evenement1', 600.00::MONEY, 1);
+--SELECT gestion_evenements.ajouterEvenement(1, '2024-11-21', 'Evenement2', 600.00::MONEY, 1); --Test: PK
+--SELECT gestion_evenements.ajouterEvenement(1, '2024-09-21', 'Evenement1', 600.00::MONEY, 1); --Test: date antérieure
+SELECT gestion_evenements.ajouterConcert(1, '2024-11-21', '20:00', 1);
+--SELECT gestion_evenements.ajouterConcert(1, '2024-11-22', '10:00', 1); --Test: tentative artiste 2 concerts au même festival
