@@ -59,78 +59,63 @@ CREATE TABLE gestion_evenements.reservations(
     FOREIGN KEY (salle,date_evenement) REFERENCES gestion_evenements.evenements(salle,date_evenement)
 );
 
+-- ajout salle
 CREATE OR REPLACE FUNCTION gestion_evenements.ajouterSalle(_nom VARCHAR(50), _ville VARCHAR(30), _capacite INTEGER) RETURNS INTEGER AS $$
 DECLARE
     toReturn INTEGER;
 BEGIN
-    INSERT INTO gestion_evenements.salles(nom, ville, capacite) VALUES (_nom, _ville, _capacite);
-
-    SELECT s.id_salle INTO toReturn
-    FROM gestion_evenements.salles s
-    WHERE s.nom = _nom
-      AND s.ville = _ville
-      AND s.capacite = _capacite;
-
+    INSERT INTO gestion_evenements.salles(nom, ville, capacite) VALUES (_nom, _ville, _capacite)
+    RETURNING id_salle INTO toReturn;
     RETURN toReturn;
 END;
 $$ LANGUAGE plpgsql;
 
+-- ajout festival
 CREATE OR REPLACE FUNCTION gestion_evenements.ajouterFestival(_nom VARCHAR(100)) RETURNS INTEGER AS $$
 DECLARE
     toReturn INTEGER;
 BEGIN
-    INSERT INTO gestion_evenements.festivals(nom) VALUES (_nom);
-
-    SELECT f.id_festival INTO toReturn
-    FROM gestion_evenements.festivals f
-    WHERE f.nom = _nom;
-
+    INSERT INTO gestion_evenements.festivals(nom) VALUES (_nom)
+    RETURNING id_festival INTO toReturn;
     RETURN toReturn;
 END;
 $$ LANGUAGE plpgsql;
 
+-- ajout artiste
 CREATE OR REPLACE FUNCTION gestion_evenements.ajouterArtiste(_nom VARCHAR(100), _nationalite CHAR(3)) RETURNS INTEGER AS $$
 DECLARE
     toReturn INTEGER;
 BEGIN
-    INSERT INTO gestion_evenements.artistes(nom, nationalite) VALUES (_nom, _nationalite);
-
-    SELECT a.id_artiste INTO toReturn
-    FROM gestion_evenements.artistes a
-    WHERE a.nom = _nom
-      AND a.nationalite = _nationalite;
-
+    INSERT INTO gestion_evenements.artistes(nom, nationalite) VALUES (_nom, _nationalite)
+    RETURNING id_artiste INTO toReturn;
     RETURN toReturn;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION gestion_evenements.ajouterArtiste(_nom VARCHAR(100)) RETURNS INTEGER AS $$
-DECLARE
-    toReturn INTEGER;
-BEGIN
-    INSERT INTO gestion_evenements.artistes(nom) VALUES (_nom);
-
-    SELECT a.id_artiste INTO toReturn
-    FROM gestion_evenements.artistes a
-    WHERE a.nom = _nom;
-
-    RETURN toReturn;
-END;
-$$ LANGUAGE plpgsql;
-
+-- ajout client
 CREATE OR REPLACE FUNCTION gestion_evenements.ajouterClient(_nom_utilisateur VARCHAR(25), _email VARCHAR(50), _mot_de_passe VARCHAR(60))
     RETURNS INTEGER AS $$
 DECLARE
     toReturn INTEGER;
 BEGIN
-    INSERT INTO gestion_evenements.clients(nom_utilisateur, email, mot_de_passe) VALUES (_nom_utilisateur, _email, _mot_de_passe);
-
-    SELECT c.id_client INTO toReturn
-    FROM gestion_evenements.clients c
-    WHERE c.nom_utilisateur = _nom_utilisateur
-      AND c.email = _email
-      AND c.mot_de_passe = _mot_de_passe;
-
+    INSERT INTO gestion_evenements.clients(nom_utilisateur, email, mot_de_passe) VALUES (_nom_utilisateur, _email, _mot_de_passe)
+    RETURNING id_client INTO toReturn;
     RETURN toReturn;
 END
 $$ LANGUAGE plpgsql;
+
+/* TESTS */
+SELECT gestion_evenements.ajouterSalle('Palais 12', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('La Madeleine', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('Cirque Royal', 'Bruxelles', 15000);
+SELECT gestion_evenements.ajouterSalle('Sportpaleis Antwerpen', 'Anvers', 15000);
+
+SELECT gestion_evenements.ajouterFestival('Les Ardentes');
+SELECT gestion_evenements.ajouterFestival('Lolapalooza');
+SELECT gestion_evenements.ajouterFestival('Afronation');
+
+SELECT gestion_evenements.ajouterArtiste('Beyoncé', 'USA');
+
+SELECT gestion_evenements.ajouterClient('user007', 'user007@live.be', '***********');
+--SELECT gestion_evenements.ajouterClient('user007', 'user007@.be', '***ok********'); --Test: PK
+SELECT gestion_evenements.ajouterClient('user1203', 'user007@live.be', '***********');

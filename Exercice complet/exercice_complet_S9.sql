@@ -160,6 +160,105 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER ajouterConcertTrigger BEFORE INSERT ON gestion_evenements.concerts
 FOR EACH ROW EXECUTE PROCEDURE gestion_evenements.ajouterConcertTrigger();
 
+-- ajout réservation
+CREATE OR REPLACE FUNCTION gestion_evenements.ajouterReservation(_id_salle INTEGER, _date_evenement DATE, _nb_tickets INTEGER, _id_client INTEGER)
+    RETURNS INTEGER AS $$
+DECLARE
+    toReturn INTEGER;
+BEGIN
+    INSERT INTO gestion_evenements.reservations(salle, date_evenement, nb_tickets, client)
+    VALUES (_id_salle, _date_evenement, _nb_tickets, _id_client)
+    RETURNING num_reservation INTO toReturn;
+    RETURN toReturn;
+END
+$$ LANGUAGE plpgsql;
+
+--trigger réservation
+CREATE OR REPLACE FUNCTION gestion_evenements.ajouterReservationTrigger() RETURNS TRIGGER AS $$
+DECLARE
+    toReturn INTEGER;
+BEGIN
+    -- si la date de l'événement est déjà passée
+    IF (NEW.date_evenement < CURRENT_DATE) THEN
+        RAISE EXCEPTION 'La date de l''événement est déjà passée';
+    END IF;
+
+    -- l’événement n’a pas de concert
+    IF (NOT EXISTS(SELECT * FROM gestion_evenements.concerts c WHERE c.date_evenement = NEW.date_evenement AND c.salle = NEW.salle)) THEN
+        RAISE EXCEPTION 'L’événement n’a pas de concert';
+    END IF;
+
+    -- le client réserve trop de places pour l'événement
+    IF (NEW.nb_tickets + (SELECT COALESCE(SUM(r.nb_tickets),0)
+                          FROM gestion_evenements.reservations r
+                          WHERE r.salle = NEW.salle
+                            AND r.date_evenement = NEW.date_evenement
+                            AND r.client = NEW.client)) > 4 THEN
+        RAISE EXCEPTION 'Ce client réserve trop de places pour l''événement (4 maximum)';
+    END IF;
+
+    -- Le client a déjà une réservation pour un autre événement à la même date
+    IF (EXISTS(SELECT *
+               FROM gestion_evenements.reservations r
+               WHERE r.client = NEW.client
+                 AND r.date_evenement = NEW.date_evenement
+                 AND r.salle != NEW.salle)) THEN
+        RAISE EXCEPTION 'Ce client a déjà une réservation pour un autre événement à la même date';
+    END IF;
+
+    -- update des places restantes
+    UPDATE gestion_evenements.evenements e SET nb_places_restantes = nb_places_restantes - NEW.nb_tickets
+    WHERE e.date_evenement = NEW.date_evenement AND e.salle = NEW.salle;
+
+    -- initialisation du numéro de réservation
+    SELECT COUNT(*) + 1
+    FROM gestion_evenements.reservations r
+    WHERE r.date_evenement = NEW.date_evenement
+      AND r.salle = NEW.salle
+    INTO NEW.num_reservation;
+
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ajouterReservationTrigger BEFORE INSERT ON gestion_evenements.reservations
+FOR EACH ROW EXECUTE PROCEDURE gestion_evenements.ajouterReservationTrigger();
+
+-- reservation festival
+CREATE OR REPLACE FUNCTION gestion_evenements.reserverFestival(_id_festival INTEGER, _id_client INTEGER, _nb_places INTEGER)
+    RETURNS VOID AS $$
+DECLARE
+    _evenement RECORD;
+BEGIN
+    FOR _evenement IN
+    SELECT e.date_evenement, e.salle FROM gestion_evenements.evenements e
+    WHERE e.festival = _id_festival
+    LOOP
+        PERFORM gestion_evenements.ajouterReservation(_evenement.salle, _evenement.date_evenement,
+                                                      _nb_places, _id_client);
+    END LOOP;
+END
+$$ LANGUAGE plpgsql;
+
+--view festivals pour client
+CREATE OR REPLACE VIEW gestion_evenements.festivalView AS
+SELECT f.id_festival, f.nom, MIN(e.date_evenement), MAX(e.date_evenement), SUM(e.prix) AS "prix_total"
+FROM gestion_evenements.evenements e, gestion_evenements.festivals f
+WHERE e.festival = f.id_festival
+GROUP BY f.id_festival, f.nom
+HAVING MAX(e.date_evenement) >= CURRENT_DATE
+ORDER BY 3;
+
+--view reservations-clients
+CREATE OR REPLACE VIEW gestion_evenements.reservationsClients AS
+SELECT e.nom, e.date_evenement, r.num_reservation, r.client, r.nb_tickets
+FROM gestion_evenements.evenements e, gestion_evenements.reservations r, gestion_evenements.salles s
+WHERE r.date_evenement = e.date_evenement
+  AND r.salle = e.salle
+  AND r.salle = s.id_salle;
+
+
+
 /* TESTS */
 SELECT gestion_evenements.ajouterSalle('Palais 12', 'Bruxelles', 15000);
 SELECT gestion_evenements.ajouterSalle('La Madeleine', 'Bruxelles', 15000);
@@ -182,3 +281,9 @@ SELECT gestion_evenements.ajouterEvenement(2, '2025-05-01', 'Evenement2', 10.00:
 --SELECT gestion_evenements.ajouterEvenement(1, '2024-09-21', 'Evenement1', 600.00::MONEY, 1); --Test: date antérieure
 SELECT gestion_evenements.ajouterConcert(1, '2025-05-20', '20:00', 1);
 --SELECT gestion_evenements.ajouterConcert(1, '2025-05-20', '10:00', 1); --Test: tentative artiste 2 concerts au même festival
+
+SELECT gestion_evenements.ajouterReservation(1, '2025-05-20', 2, 1);
+
+SELECT * FROM gestion_evenements.festivalView;
+
+SELECT * FROM gestion_evenements.reservationsClients;
