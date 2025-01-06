@@ -14,7 +14,7 @@ CREATE TABLE examen.examens (
 
 CREATE TABLE examen.locaux (
     id              SERIAL      PRIMARY KEY,
-    nom_local       VARCHAR(50) NOT NULL CHECK ( trim(nom_local) != '' ),
+    nom_local       VARCHAR(50) UNIQUE NOT NULL CHECK ( trim(nom_local) != '' ),
     nbre_places     INTEGER     NOT NULL CHECK ( nbre_places > 0 ),
     machine_dispo   BOOLEAN     NOT NULL DEFAULT FALSE
 );
